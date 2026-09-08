@@ -1,39 +1,108 @@
-# PeriphShop — АИС интернет-магазина компьютерной техники и периферии
+# PeriphShop
 
-Курсовая работа, 5 семестр. Полный стенд: ASP.NET Core 9 + Angular 20 + MySQL 8.4,
-с мониторингом (Prometheus, Grafana, Loki) и развёртыванием одной командой.
+Автоматизированная информационная система интернет-магазина компьютерной техники
+и периферии. Курсовая работа, 5 семестр.
+
+Система закрывает полный цикл розничной продажи: каталог товаров, корзина,
+оформление и сопровождение заказа, складской учёт, рабочее место менеджера
+и наблюдаемость (метрики, логи, дашборды).
+
+## Стек
+
+| Часть | Технологии |
+|-------|-----------|
+| Backend | ASP.NET Core 9 (C#), EF Core 9, Pomelo MySQL, JWT, Serilog, prometheus-net |
+| Frontend | Angular 20 (standalone-компоненты, signals), SCSS |
+| База данных | MySQL 8.4 |
+| Инфраструктура | Docker Compose, Nginx, Redis, MinIO, Mailpit, Adminer |
+| Мониторинг | Prometheus, Grafana, Loki, Promtail, mysqld/node-exporter, cAdvisor |
+
+Все компоненты — с открытыми лицензиями.
+
+## Возможности
+
+**Покупатель**
+- каталог с фильтрами по категории, бренду, цене, наличию и скидке, поиск и сортировка;
+- карточка товара: характеристики, изображения, отзывы, похожие товары;
+- корзина (работает и для гостя, при входе сливается с корзиной пользователя);
+- оформление заказа: способ доставки, оплата, промокод, комментарий;
+- личный кабинет: список заказов, детали и история статусов, отмена, избранное, профиль.
+
+**Менеджер и администратор**
+- сводка: выручка, число заказов, средний чек, динамика продаж, топ товаров;
+- очередь заказов: фильтры, смена статуса по заданному графу переходов, выгрузка в CSV;
+- товары: создание и редактирование, движения складского остатка с историей;
+- модерация отзывов, промокоды, управление пользователями и ролями, журнал аудита.
+
+**Платформа**
+- роли Guest / Customer / Manager / Admin и разграничение доступа;
+- JWT с обновлением токенов, ограничение частоты запросов, валидация запросов;
+- списание и возврат складских остатков в транзакции;
+- метрики Prometheus (технические и бизнес-), структурные логи, health-checks;
+- миграции БД и демонстрационные данные применяются при старте.
+
+## Структура репозитория
+
+```
+backend/     ASP.NET Core: Domain / Application / Infrastructure / Api + тесты
+frontend/    Angular SPA
+db/          init-скрипты MySQL и заметки по работе с БД
+docs/        техническое задание, модель данных, описание API
+ops/         конфигурация Prometheus, Grafana, Loki, Promtail
+docker-compose.yml
+```
 
 ## Документация
 
-| Документ | Содержание |
-|----------|-----------|
-| [`docs/SPEC.md`](docs/SPEC.md) | Полное техническое задание: цели, роли, 60+ функциональных требований, архитектура, безопасность, мониторинг, тестирование |
-| [`docs/DB.md`](docs/DB.md) | Модель данных: 17 таблиц, ключи, индексы, инварианты, аналитические запросы |
-| [`docs/API.md`](docs/API.md) | Справочник REST API с примерами запросов и ответов |
-| [`db/README.md`](db/README.md) | Работа с БД и миграциями |
+| Файл | О чём |
+|------|-------|
+| [`docs/SPEC.md`](docs/SPEC.md) | Техническое задание: цели, роли, требования, архитектура, безопасность, мониторинг |
+| [`docs/DB.md`](docs/DB.md) | Модель данных: таблицы, связи, индексы, инварианты |
+| [`docs/API.md`](docs/API.md) | Справочник REST API с примерами |
+| [`db/README.md`](db/README.md) | Работа с базой и миграциями |
 
-## Быстрый старт
+## Запуск через Docker
+
+Нужен Docker Desktop с работающим движком (на Windows — включённый WSL 2).
 
 ```bash
-cp .env.example .env          # при необходимости поменять пароли и Jwt-ключ
-docker compose up -d --build  # поднять весь стенд
-docker compose logs -f api    # дождаться строки "Application started"
+cp .env.example .env
+docker compose up -d --build
 ```
 
-После старта доступно:
+| Адрес | Что это |
+|-------|---------|
+| http://localhost | Магазин |
+| http://localhost:8080/swagger | Swagger UI |
+| http://localhost:3000 | Grafana (admin / admin) |
+| http://localhost:9090 | Prometheus |
+| http://localhost:8025 | Mailpit — письма о заказах |
+| http://localhost:8081 | Adminer — веб-клиент БД |
 
-| Адрес | Назначение | Доступ |
-|-------|-----------|--------|
-| http://localhost | Магазин (Angular SPA) | — |
-| http://localhost:8080/swagger | Swagger UI Web API | — |
-| http://localhost:8080/metrics | Метрики Prometheus | — |
-| http://localhost:3000 | Grafana с готовыми дашбордами | admin / admin |
-| http://localhost:9090 | Prometheus | — |
-| http://localhost:8025 | Mailpit — письма о заказах | — |
-| http://localhost:8081 | Adminer — веб-клиент БД | сервер `mysql`, БД `periphshop` |
-| http://localhost:9001 | Консоль MinIO | из `.env` |
+## Запуск без Docker
 
-Демонстрационные учётные записи (создаются сидом):
+Нужны .NET SDK 9, Node.js 20+ и запущенный MySQL 8.
+
+```bash
+# 1. Создать базу и пользователя в MySQL
+#    CREATE DATABASE periphshop CHARACTER SET utf8mb4;
+#    CREATE USER 'periphshop'@'%' IDENTIFIED BY 'periphshop';
+#    GRANT ALL PRIVILEGES ON periphshop.* TO 'periphshop'@'%';
+
+# 2. Backend — http://localhost:8080
+#    строка подключения и Jwt:Key берутся из backend/src/PeriphShop.Api/appsettings.json
+cd backend
+dotnet run --project src/PeriphShop.Api
+
+# 3. Frontend — http://localhost:4200 (запросы /api проксируются на :8080)
+cd frontend
+npm install
+npm start
+```
+
+Миграции и демонстрационные данные применяются автоматически при первом запуске API.
+
+## Учётные записи демо-данных
 
 | Роль | Логин | Пароль |
 |------|-------|--------|
@@ -41,70 +110,10 @@ docker compose logs -f api    # дождаться строки "Application sta
 | Менеджер | `manager@periphshop.local` | `Manager123!` |
 | Покупатель | `user@periphshop.local` | `User123!` |
 
-## Что реализовано
-
-**Покупатель:** каталог с фасетным фильтром и сортировкой, карточка товара с характеристиками
-и отзывами, корзина для гостя и пользователя со слиянием при входе, оформление заказа
-с промокодом и выбором доставки, оплата картой (имитация шлюза), отмена заказа,
-личный кабинет, избранное, отзывы с модерацией.
-
-**Менеджер и администратор:** сводка по выручке и заказам, топ товаров, отчёт по низким остаткам,
-очередь заказов со сменой статуса по графу переходов, выгрузка заказов в CSV, CRUD товаров,
-движения складского остатка, модерация отзывов, промокоды, управление пользователями
-и ролями, журнал аудита.
-
-**Платформа:** JWT с ротацией refresh-токенов, RBAC, rate limiting, валидация FluentValidation,
-ответы `application/problem+json`, транзакционное списание остатков, структурные логи,
-метрики Prometheus (в том числе бизнес-метрики), health-checks, миграции и сид при старте.
-
-## Структура репозитория
-
-```
-backend/                     ASP.NET Core 9, слоистая архитектура
-  src/PeriphShop.Domain/       сущности, перечисления, доменные правила
-  src/PeriphShop.Application/  DTO, сервисы, валидаторы
-  src/PeriphShop.Infrastructure/ EF Core, миграции, сид, JWT, SMTP, аудит
-  src/PeriphShop.Api/          контроллеры, middleware, метрики, Swagger
-  tests/PeriphShop.Tests/      33 юнит-теста бизнес-логики
-frontend/                    Angular 20 (standalone-компоненты, signals)
-db/                          init-скрипты и заметки по БД
-docs/                        ТЗ, модель данных, описание API
-ops/                         Prometheus, Grafana, Loki, Promtail
-docker-compose.yml           стенд целиком
-```
-
-## Разработка без Docker
+## Тесты
 
 ```bash
-# 1. База данных
-docker compose up -d mysql redis
-
-# 2. Backend (http://localhost:8080)
-cd backend
-dotnet run --project src/PeriphShop.Api
-
-# 3. Frontend (http://localhost:4200, прокси /api → :8080)
-cd frontend
-npm install
-npm start
-
-# Тесты
 cd backend && dotnet test
 ```
 
-## Мониторинг
-
-Дашборды Grafana создаются автоматически (папка **PeriphShop**):
-
-- **API Overview** — RPS, доля 5xx, латентность p50/p95/p99, топ маршрутов.
-- **Business** — заказы, выручка, средний чек, добавления в корзину, отказы оформления,
-  переходы статусов, попытки входа.
-- **Infrastructure** — CPU и память контейнеров, состояние MySQL, InnoDB buffer pool.
-- **Logs** — поток структурных логов из Loki с фильтром по уровню.
-
-Правила оповещения — в [`ops/prometheus/alerts.yml`](ops/prometheus/alerts.yml).
-
-## Лицензии используемых компонентов
-
-Все компоненты стенда — открытые: .NET, EF Core, Pomelo, Angular, Nginx, Redis, MySQL,
-Prometheus, Grafana OSS, Loki, Promtail, MinIO, Mailpit, Adminer, cAdvisor, node-exporter.
+Покрыта бизнес-логика заказов, корзины, склада, промокодов и отзывов.
