@@ -1,0 +1,40 @@
+# Сбор метрик приложения и инфраструктуры (раздел 10.1 ТЗ).
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    stand: periphshop
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['api:8080']
+        labels:
+          service: periphshop-api
+
+  - job_name: mysql
+    static_configs:
+      - targets: ['mysqld-exporter:9104']
+        labels:
+          service: mysql
+
+  - job_name: node
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: host
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: containers

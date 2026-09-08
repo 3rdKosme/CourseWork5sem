@@ -1,0 +1,63 @@
+<header class="header">
+  <div class="container header__inner">
+    <a routerLink="/" class="logo">
+      <span class="logo__mark">PS</span>
+      <span class="logo__text">PeriphShop</span>
+    </a>
+
+    <form class="search" (ngSubmit)="submitSearch()">
+      <input
+        type="search"
+        name="search"
+        placeholder="Поиск по названию или артикулу"
+        [(ngModel)]="search"
+        [ngModelOptions]="{ standalone: true }"
+      />
+      <button type="submit" class="btn btn--primary">Найти</button>
+    </form>
+
+    <nav class="header__nav">
+      <a routerLink="/catalog" routerLinkActive="active">Каталог</a>
+
+      @if (auth.isStaff()) {
+        <a routerLink="/admin" routerLinkActive="active">Рабочее место</a>
+      }
+
+      @if (auth.isAuthenticated()) {
+        <a routerLink="/account/orders" routerLinkActive="active">Заказы</a>
+        <a routerLink="/account/favorites" routerLinkActive="active" class="hide-sm">Избранное</a>
+        <a routerLink="/account/profile" routerLinkActive="active" class="hide-sm">{{ auth.user()?.fullName }}</a>
+        <button type="button" class="link-button" (click)="logout()">Выйти</button>
+      } @else {
+        <a routerLink="/login" routerLinkActive="active">Вход</a>
+        <a routerLink="/register" routerLinkActive="active" class="hide-sm">Регистрация</a>
+      }
+
+      <a routerLink="/cart" class="cart-link" routerLinkActive="active">
+        Корзина
+        @if (cart.count() > 0) {
+          <span class="cart-link__badge">{{ cart.count() }}</span>
+        }
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main class="container main">
+  <router-outlet />
+</main>
+
+<footer class="footer">
+  <div class="container footer__inner">
+    <div>
+      <strong>PeriphShop</strong>
+      <p class="muted">АИС интернет-магазина компьютерной техники и периферии</p>
+    </div>
+    <div class="muted">
+      <p>Учебный проект, курсовая работа, 5 семестр</p>
+      <p>Демо-доступы: user&#64;periphshop.local / User123!</p>
+    </div>
+  </div>
+</footer>
+
+<app-toasts />

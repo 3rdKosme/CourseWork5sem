@@ -467,8 +467,7 @@ users       1—∞ audit_logs
 | `mysql` | mysql:8.4 | 3306 | СУБД |
 | `redis` | redis:7-alpine | 6379 | Кэш |
 | `api` | сборка `backend/Dockerfile` | 8080 | Web API |
-| `web` | сборка `frontend/Dockerfile` | 4200 | SPA за Nginx |
-| `nginx` | nginx:alpine | 80 | Единая точка входа, прокси `/api` |
+| `web` | сборка `frontend/Dockerfile` (Nginx внутри образа) | 80 | Единая точка входа: статика SPA и обратный прокси `/api` |
 | `minio` | minio/minio | 9000 / 9001 | Хранилище изображений |
 | `mailpit` | axllent/mailpit | 8025 | Перехват почты |
 | `adminer` | adminer | 8081 | Веб-клиент БД |

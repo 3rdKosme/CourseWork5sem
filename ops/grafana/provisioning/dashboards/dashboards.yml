@@ -1,0 +1,14 @@
+# Дашборды подхватываются из каталога репозитория (раздел 10.2 ТЗ).
+apiVersion: 1
+
+providers:
+  - name: periphshop
+    orgId: 1
+    folder: PeriphShop
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

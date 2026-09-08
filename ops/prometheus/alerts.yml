@@ -1,0 +1,66 @@
+# Правила оповещения из раздела 10.5 ТЗ.
+
+groups:
+  - name: periphshop-availability
+    rules:
+      - alert: ApiDown
+        expr: up{job="api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Web API недоступен"
+          description: "Prometheus не может собрать метрики с api:8080 более минуты."
+
+      - alert: MySqlDown
+        expr: mysql_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL недоступна"
+          description: "mysqld-exporter сообщает о недоступности базы данных."
+
+  - name: periphshop-quality
+    rules:
+      - alert: ApiHighErrorRate
+        expr: |
+          sum(rate(http_requests_received_total{code=~"5.."}[5m]))
+            /
+          clamp_min(sum(rate(http_requests_received_total[5m])), 0.001) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Доля ошибок 5xx выше 5%"
+          description: "API отвечает ошибками более чем на 5% запросов последние 5 минут."
+
+      - alert: ApiHighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "95-й перцентиль латентности выше 1 с"
+          description: "Нарушается NFR-01: время ответа API деградировало."
+
+  - name: periphshop-business
+    rules:
+      - alert: LowStockSpike
+        expr: periphshop_products_low_stock > 20
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Много товаров заканчивается на складе"
+          description: "Более 20 позиций имеют остаток ниже порога — нужна закупка."
+
+      - alert: CheckoutFailuresSpike
+        expr: sum(rate(periphshop_checkout_failures_total[10m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Растут отказы оформления заказов"
+          description: "Покупатели не могут оформить заказ: проверьте остатки и промокоды."

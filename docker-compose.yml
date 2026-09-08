@@ -1,0 +1,251 @@
+# Стенд АИС «PeriphShop»: приложение, БД, кэш, хранилище файлов и наблюдаемость.
+# Запуск: cp .env.example .env && docker compose up -d --build
+
+name: periphshop
+
+services:
+  # ---------- Данные ----------
+
+  mysql:
+    image: mysql:8.4
+    container_name: periphshop-mysql
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --max_connections=200
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [periphshop]
+
+  redis:
+    image: redis:7-alpine
+    container_name: periphshop-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [periphshop]
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: periphshop-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    networks: [periphshop]
+
+  # ---------- Приложение ----------
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: periphshop-api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: "server=mysql;port=3306;database=${MYSQL_DATABASE};user=${MYSQL_USER};password=${MYSQL_PASSWORD};AllowUserVariables=true"
+      ConnectionStrings__Redis: "redis:6379"
+      Jwt__Key: ${JWT_KEY}
+      Jwt__Issuer: periphshop
+      Jwt__Audience: periphshop-spa
+      Smtp__Enabled: "true"
+      Smtp__Host: mailpit
+      Smtp__Port: "1025"
+      Cors__Origins__0: "http://localhost"
+      Cors__Origins__1: "http://localhost:4200"
+      Swagger__Enabled: "true"
+      Database__MigrateOnStartup: "true"
+      Database__SeedOnStartup: "true"
+    ports:
+      - "${API_PORT:-8080}:8080"
+    networks: [periphshop]
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: periphshop-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-80}:80"
+    networks: [periphshop]
+
+  # ---------- Вспомогательные сервисы стенда ----------
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: periphshop-mailpit
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 500
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    networks: [periphshop]
+
+  adminer:
+    image: adminer:latest
+    container_name: periphshop-adminer
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      ADMINER_DEFAULT_SERVER: mysql
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
+    networks: [periphshop]
+
+  # ---------- Наблюдаемость (раздел 10 ТЗ) ----------
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: periphshop-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./ops/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks: [periphshop]
+
+  grafana:
+    image: grafana/grafana-oss:11.5.1
+    container_name: periphshop-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - loki
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: "5s"
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    networks: [periphshop]
+
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: periphshop-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./ops/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    networks: [periphshop]
+
+  promtail:
+    image: grafana/promtail:3.3.2
+    container_name: periphshop-promtail
+    restart: unless-stopped
+    depends_on:
+      - loki
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./ops/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [periphshop]
+
+  mysqld-exporter:
+    image: prom/mysqld-exporter:v0.16.0
+    container_name: periphshop-mysqld-exporter
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Учётная запись создаётся скриптом db/init/01-init.sql: ей выданы
+      # PROCESS и REPLICATION CLIENT, необходимые экспортёру.
+      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_EXPORTER_PASSWORD:-exporter}
+    command:
+      - --mysqld.username=exporter
+      - --mysqld.address=mysql:3306
+    ports:
+      - "${MYSQLD_EXPORTER_PORT:-9104}:9104"
+    networks: [periphshop]
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: periphshop-node-exporter
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    ports:
+      - "${NODE_EXPORTER_PORT:-9100}:9100"
+    networks: [periphshop]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: periphshop-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "${CADVISOR_PORT:-8082}:8080"
+    networks: [periphshop]
+
+networks:
+  periphshop:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:
+  minio-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:
