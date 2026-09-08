@@ -1,0 +1,34 @@
+# --- .NET ---
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+.vs/
+.idea/
+TestResults/
+*.trx
+
+# --- Angular / Node ---
+node_modules/
+dist/
+.angular/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Секреты и окружение (раздел 9 ТЗ) ---
+.env
+.env.*
+!.env.example
+*.pfx
+*.key
+
+# --- Данные стенда ---
+docker-data/
+*.log
+
+# --- ОС ---
+Thumbs.db
+.DS_Store
+desktop.ini

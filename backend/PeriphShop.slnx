@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PeriphShop.Api/PeriphShop.Api.csproj" />
+    <Project Path="src/PeriphShop.Application/PeriphShop.Application.csproj" />
+    <Project Path="src/PeriphShop.Domain/PeriphShop.Domain.csproj" />
+    <Project Path="src/PeriphShop.Infrastructure/PeriphShop.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PeriphShop.Tests/PeriphShop.Tests.csproj" />
+  </Folder>
+</Solution>
